@@ -9,30 +9,41 @@ import java.security.NoSuchAlgorithmException;
 import java.util.concurrent.TimeoutException;
 
 public class SendMessage {
-    public static final String EX = "demo1";
+    public static final String message = "message";
 
     public static void sendMessage() throws NoSuchAlgorithmException, KeyManagementException, URISyntaxException, IOException, TimeoutException {
         ConnectionFactory factory = new ConnectionFactory();
 
-        factory.setUri("amqps://ymmlbeft:IPSFfJDg35dEtLtQttfQNKnIw0XCRokl@sparrow.rmq.cloudamqp.com/ymmlbeft");
+        factory.setUri("a");
 
-        Connection connection = factory.newConnection();
-        Channel channel = connection.createChannel();
+        final Connection connection = factory.newConnection();
+        final Channel channel = connection.createChannel();
 
-        channel.exchangeDeclare(EX, BuiltinExchangeType.DIRECT);
+        channel.basicQos(1);
+        DeliverCallback deliverCallback = (consumerTag, delivery) -> {
+            String comment = new String(delivery.getBody(), "UTF-8");
 
-        String queueName = channel.queueDeclare().getQueue();
-
-        channel.queueBind(queueName, EX, "one");
-
-        Consumer consumer = new DefaultConsumer(channel){
-            @Override
-            public void handleDelivery(String consumeTag, Envelope envelope,
-                                       AMQP.BasicProperties properties, byte[] body){
-                System.out.println("Message received : " + new String(body));
+            System.out.println(" [x] Received '" + comment + "'");
+            try {
+                doWork(comment);
+            } finally {
+                System.out.println(" [x] Done");
+                channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
             }
         };
-
-        channel.basicConsume(queueName, true, consumer);
+        channel.basicConsume(message, false, deliverCallback, consumerTag -> { });
     }
+
+    private static void doWork(String task) {
+        for (char ch : task.toCharArray()) {
+            if (ch == '.') {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException _ignored) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        }
+    }
+
 }
